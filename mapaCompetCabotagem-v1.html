@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>
+			Mapa de Competitividade da Cabotagem
+		</title>
+		<!-- Leaflet -->
+		<link rel="stylesheet" href="lib/leaflet.css" />
+		<link rel="stylesheet" href="lib/leaflet.label.css" />
+		<script src="lib/leaflet.js"></script>
+		<script src="lib/leaflet.label.js"></script>
+		<script src="data/rgi.geojson"></script>
+		<script src="data/pctCusto.js"></script>
+		<script src="data/pctCO2.js"></script>
+		<script src="data/portos.js"></script>
+		<style type="text/css"></style>
+		<style>
+			html, body {
+				height: 100%;
+				margin: 0;
+			}
+			#map {width: 600px; height: 550px;float: left; margin-left: 70px;}
+			#map1 {width: 600px; height: 550px;float: left;margin-left: 80px;}
+			.info {
+				padding: 6px 8px;
+				font: 14px/16px Arial, Helvetica, sans-serif;
+				background: white;
+				background: rgba(255,255,255,0.8);
+				box-shadow: 0 0 15px rgba(0,0,0,0.2);
+				border-radius: 5px;
+			}
+			.info h4 {
+				margin: 0 0 5px;
+				color: #777;
+			}
+		</style>
+		<style>
+			div.a {
+				text-align: center;
+			}
+		</style>
+		<style>
+			div.b {
+				margin-left : 200px;
+			}
+		</style>
+		<style>
+			.legend {
+				line-height: 18px;
+				color: #555;
+			}
+			.legend i {
+				width: 18px;
+				height: 18px;
+				float: left;
+				margin-right: 8px;
+				opacity: 0.7;
+			}
+		</style>				
+	</head>
+	<body>
+		<div class='a'>
+			<h2>Mapa de Competitividade da Cabotagem - Custo e Emissão de CO<sup>2</sup></h2>
+			<h4>&#169Gustavo Costa 2020</h4>
+		</div>
+		<div class='b'>
+			<h3>Mapa de Custo - click na Região&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;
+				&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;Mapa de CO<sup>2</sup></h3>
+		</div>
+		<div id="map"></div>
+		<div id=map1></div>
+		<script>
+			// carrega os arquivos de dados
+			pctCusto = custo
+			pctCO2 = CO2
+			porto = portos
+			// altera os valores de pctCusto e pctCO2 para 1
+			mudapctCusto()
+			//
+			// funcao para mudar os valores do layers das regioes - pctCusto
+			//
+			function mudapctCusto() {
+				for (let i = 0; i < 135; i++) {
+					regioes.features[i].properties.pctCusto = 1.0
+					regioes.features[i].properties.pctCO2 = 1.0
+					regioes.features[i].properties.porto = porto[i][2]
+				}
+			}			
+			//
+			var map = L.map('map',{
+				setView: [-53.083711, -10.928611],
+				minZoom: 4,
+				maxZoom: 10,
+			})
+			var map1 = L.map('map1',{
+				setView: [-53.083711, -10.928611],
+				minZoom: 4,
+				maxZoom: 4,
+			})
+			//
+			L.tileLayer('https://{s}.tile.openstreetmap.de/tiles/osmde/{z}/{x}/{y}.png', {
+			attribution: '&copy; Openstreetmap | &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+			}).addTo(map)
+			//
+			L.tileLayer('https://{s}.tile.openstreetmap.de/tiles/osmde/{z}/{x}/{y}.png', {
+			attribution: '&copy; Openstreetmap | &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+			}).addTo(map1)
+			//
+			var regioesLayer
+			var regioesLayer1
+			//
+			// carrega as regioes no mapa
+			carregaGeojson()
+			//
+			function carregaGeojson() {
+				regioesLayer = L.geoJson(regioes, {
+						style: style,
+						onEachFeature: regioesOnEachFeature 
+					}
+					).addTo(map);
+				map.fitBounds(regioesLayer.getBounds())
+				//
+				regioesLayer1 = L.geoJson(regioes, {
+						style: style1
+					}
+					).addTo(map1);
+				map1.fitBounds(regioesLayer1.getBounds())
+				//
+				// estilo para o mapa de Custo
+				function style(feature) {
+					return {
+						weight: 2,
+						opacity: 1,
+						color: 'white',
+						dashArray: '3',
+						fillOpacity: 0.7,
+						fillColor: getColorCusto(feature.properties.pctCusto)
+					};
+				}
+			}	
+			//
+			// estilo para o mapa de CO2
+			function style1(feature) {
+				return {
+					weight: 2,
+					opacity: 1,
+					color: 'white',
+					dashArray: '3',
+					fillOpacity: 0.7,
+					fillColor: getColorCO2(feature.properties.pctCO2)
+				};
+			}
+			//
+			// funcao para ressaltar a regiao quando o mouse passar
+			function highlightFeature(e){
+				var layer = e.target;
+				layer.setStyle(
+					{
+						weight : 3,
+						color : 'black',
+						fillColor : 'white',
+						fillOpacity : 0.1
+					}
+				);
+				if(!L.Browser.ie && !L.Browser.opera){
+					layer.bringToFront();
+				}
+				info.update(layer.feature.properties)
+			}
+			// reseta as cores da regiao quando o mouse sai
+			function resetHighlight(e){
+				regioesLayer.resetStyle(e.target)
+				info.update()
+			}
+			// funcao muito boa para alocar eventos e popups para os features
+			function regioesOnEachFeature(feature, layer){
+				layer.on(
+					{
+						mouseover : highlightFeature,
+						mouseout : resetHighlight,
+						click : onMapClick
+					}
+				)
+			}
+			//
+			//Criar painel de informacao
+			//
+			var info = L.control()
+			//
+			info.onAdd = function(map) {
+				this._div = L.DomUtil.create('div', 'info');
+				this.update();
+				return this._div;
+			};
+			//
+			info.update = function(regioes) {
+				this._div.innerHTML = '<h4>Dados da Região Intermediária</h4>' +  (regioes ?
+					'<b>' + regioes.CD_RGINT + '</b><br />' + regioes.NM_RGINT + '</b><br />' + 'Porto: ' + regioes.porto
+					: 'Passe o Mouse sobre uma Região');
+			}
+			info.addTo(map)
+			// funcao apos clicar
+			var popup = L.popup()
+			var marker
+			var codRegiao
+			//
+			function limpaMap1() {
+				if (marker != undefined) {
+					map1.removeLayer(marker)
+				}
+				map.removeLayer(regioesLayer)
+				map1.removeLayer(regioesLayer1)
+			}
+			//
+			function onMapClick(e) {
+				popup 
+					.setLatLng(e.latlng)
+					.setContent("Regiao clicada " + e.target.feature.properties.CD_RGINT + " " + e.target.feature.properties.NM_RGINT)
+					.openOn(map),
+				limpaMap1()
+				marker = L.marker(e.latlng).addTo(map1)
+				codRegiao = e.target.feature.properties.CD_RGINT
+				atualizaPct(codRegiao)
+				carregaGeojson()
+			}
+			map.on('click', onMapClick)
+			//
+			function atualizaPct(codReg) {
+					var id = 0;
+				//
+				for (let i = 0; i < pctCusto.length; i++) {
+					if (pctCusto[i][0] == codReg) {
+					id = i
+					}  
+				}
+				for (let i = 0; i < pctCusto.length; i++) {
+					regioes.features[i].properties.pctCusto = pctCusto[id][i+1]
+					regioes.features[i].properties.pctCO2 = pctCO2[id][i+1]
+				}
+			}
+			// funcao para retonar a cor da regiao baseada em um parametro
+			function getColorCusto(d) {
+				return 	d > 0.3 ? '#32CD32' :
+						d > 0.1 ? '#0000FF' :
+						d > 0.0 ? '#FFFF00' :
+								  '#FF0000';
+			}
+			//
+			function getColorCO2(d) {
+				return 	d > 0.3 ? '#32CD32' :
+						d > 0.1 ? '#0000FF' :
+						d > 0.0 ? '#FFFF00' :
+								  '#FF0000';
+			}
+			//
+			// criar legendas - fazendo uma nova div
+			var legend = L.control({position: 'bottomright'});
+			legend.onAdd = function(map) {
+			//	
+				var div = L.DomUtil.create('div', 'info legend'),
+					grades = ['>30', '10 - 30%', '0 - 10%', '<0%'],
+					cores = ['#32CD32','#0000FF','#FFFF00','#FF0000'],
+					labels = []
+				//
+				for (var i = 0; i < grades.length; i++) {
+					labels.push('<i style="background:' + cores[i] + '"></i> ' + grades[i])
+				}
+				div.innerHTML = labels.join('<br>');
+				return div;
+			};
+			legend.addTo(map);
+			//
+			var legend1 = L.control({position: 'bottomright'});
+			legend1.onAdd = function(map1) {
+			//	
+				var div = L.DomUtil.create('div', 'info legend'),
+					grades1 = ['>30', '10 - 30%', '0 - 10%', '<0%'],
+					cores1 = ['#32CD32','#0000FF','#FFFF00','#FF0000'],
+					labels1 = []
+				//
+				for (var i = 0; i < grades1.length; i++) {
+					labels1.push('<i style="background:' + cores1[i] + '"></i> ' + grades1[i])
+				}
+				div.innerHTML = labels1.join('<br>');
+				return div;
+			}
+			legend1.addTo(map1);
+		</script>
+	</body>
+</html>
